@@ -1,0 +1,192 @@
+// working code
+import React, { useState, useEffect, useCallback } from 'react';
+import { AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+
+const exampleTasks = [
+  { id: 1, name: "Ordering a Pizza" },
+  { id: 2, name: "Booking a Flight" },
+  { id: 3, name: "Downloading a File" },
+  { id: 4, name: "Sending an Email" },
+  { id: 5, name: "Getting a Loan Approval" }
+];
+
+const TaskCard = ({ task, status, timeElapsed }) => {
+  const getStatusColor = () => {
+    switch (status) {
+      case 'Pending': return 'bg-yellow-100 border-yellow-400';
+      case 'Completed': return 'bg-green-100 border-green-400';
+      case 'Failed': return 'bg-red-100 border-red-400';
+      default: return 'bg-gray-100 border-gray-400';
+    }
+  };
+
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'Pending': return <Clock className="text-yellow-500" />;
+      case 'Completed': return <CheckCircle className="text-green-500" />;
+      case 'Failed': return <AlertCircle className="text-red-500" />;
+      default: return null;
+    }
+  };
+
+  return (
+    <div className={`p-4 mb-4 rounded-lg border ${getStatusColor()}`}>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">{task.name}</h3>
+        {getStatusIcon()}
+      </div>
+      <p className="mt-2">Status: {status}</p>
+      {timeElapsed && <p>Time: {timeElapsed.toFixed(1)}s</p>}
+    </div>
+  );
+};
+
+const PromiseLifecycle = ({ currentState }) => {
+  const states = ['Pending', 'Fulfilled', 'Rejected'];
+
+  return (
+    <div className="flex justify-around mt-4">
+      {states.map((state) => (
+        <div
+          key={state}
+          className={`p-2 rounded ${
+            currentState === state
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-200 text-gray-700'
+          }`}
+        >
+          {state}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const App = () => {
+  const [tasks, setTasks] = useState([]);
+  const [currentLog, setCurrentLog] = useState('');
+  const [currentTask, setCurrentTask] = useState(null);
+  const [currentState, setCurrentState] = useState('Pending');
+  const [taskCounter, setTaskCounter] = useState(0);
+  const [progress, setProgress] = useState(0); // For progress circle
+
+  const processTask = useCallback((task) => {
+    return new Promise((resolve, reject) => {
+      setCurrentLog(`Promise for ${task.name} is now processing.`);
+      setCurrentState('Pending');
+      setProgress(0); // Reset progress
+
+      const processingTime = Math.random() * 2000 + 1000; // 1 to 3 seconds
+      const interval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev < 100) return prev + (100 / (processingTime / 100));
+          clearInterval(interval);
+          return prev;
+        });
+      }, 100);
+
+      const shouldFail = Math.random() > 0.8; // 20% chance of failure
+
+      setTimeout(() => {
+        clearInterval(interval); // Clear the interval
+        if (shouldFail) {
+          setCurrentState('Rejected');
+          setCurrentLog(`Promise for ${task.name} was rejected.`);
+          reject(`Promise for ${task.name} was rejected.`);
+        } else {
+          setCurrentState('Fulfilled');
+          setCurrentLog(`Promise for ${task.name} resolved successfully.`);
+          resolve(`Promise for ${task.name} resolved.`);
+        }
+      }, processingTime);
+    });
+  }, []);
+
+  const addTask = useCallback(() => {
+    const newTask = exampleTasks[taskCounter % exampleTasks.length];
+    setTaskCounter((prevCounter) => prevCounter + 1);
+    setCurrentTask(newTask); // Set current task
+
+    processTask(newTask)
+      .then(() => {
+        setTasks((prevTasks) => [
+          ...prevTasks,
+          { ...newTask, status: 'Completed' }
+        ]);
+      })
+      .catch(() => {
+        setTasks((prevTasks) => [
+          ...prevTasks,
+          { ...newTask, status: 'Failed' }
+        ]);
+      });
+  }, [taskCounter, processTask]);
+
+  useEffect(() => {
+    if (currentTask) {
+      setTasks((prevTasks) =>
+        prevTasks.map((task) => ({
+          ...task,
+          timeElapsed: (Date.now() - task.startTime) / 1000,
+        }))
+      );
+    }
+  }, [currentTask]);
+
+  return (
+    <div className="container mx-auto p-4 bg-light-blue-100">
+      <h1 className="text-3xl font-bold mb-4">JavaScript Promises Simulation</h1>
+      <button
+        onClick={addTask}
+        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+      >
+        Add Task
+      </button>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div>
+          <h2 className="text-2xl font-semibold mb-2">Task Queue</h2>
+          {tasks.map((task) => (
+            <TaskCard key={task.id} task={task} status={task.status} />
+          ))}
+          {currentTask && (
+            <div className="relative mt-4">
+              <div className="h-2 bg-gray-200 rounded-full">
+                <div
+                  style={{ width: `${progress}%` }}
+                  className="h-full bg-blue-500 rounded-full"
+                ></div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h2 className="text-2xl font-semibold mb-2">Logs</h2>
+          <div className="bg-gray-100 p-4 rounded-lg">
+            <Alert variant={currentState === 'Fulfilled' ? 'default' : 'destructive'}>
+              <AlertTitle>{currentState}</AlertTitle>
+              <AlertDescription>{currentLog}</AlertDescription>
+            </Alert>
+          </div>
+          <h2 className="text-2xl font-semibold mt-4 mb-2">Completed Tasks</h2>
+          <ul className="bg-gray-100 p-4 rounded-lg">
+            {tasks.filter(task => task.status === 'Completed').map((task) => (
+              <li key={task.id} className="mb-1">
+                {task.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-2xl font-semibold mb-2">Promise Lifecycle</h2>
+        <PromiseLifecycle currentState={currentState} />
+      </div>
+    </div>
+  );
+};
+
+export default App;
